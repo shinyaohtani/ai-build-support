@@ -31,13 +31,14 @@ else
   exit 1
 fi
 
-# Auto-detect SCHEME from *.xcodeproj unless already set in .build_config
+# Auto-detect SCHEME from *.xcodeproj directory unless already set in .build_config
 if [[ -z "${SCHEME:-}" ]]; then
-  SCHEME="${$(ls *.xcodeproj 2>/dev/null | head -1)%.xcodeproj}"
-  if [[ -z "$SCHEME" ]]; then
+  local -a _projs=( *.xcodeproj(N/) )
+  if [[ ${#_projs} -eq 0 ]]; then
     echo "Error: no *.xcodeproj found in ${PWD} and SCHEME not set in .build_config" >&2
     exit 1
   fi
+  SCHEME="${_projs[1]%.xcodeproj}"
 fi
 
 CONFIG="${CONFIG:-Release}"
