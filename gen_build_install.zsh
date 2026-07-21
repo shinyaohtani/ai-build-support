@@ -47,6 +47,78 @@ PROJECT="${SCHEME}.xcodeproj"
 [[ -n "$BUNDLE_ID" ]] && PLATFORM="ios" || PLATFORM="macos"
 
 # ------------------------------------------------------------------
+# Verbosity: verbose | normal | quiet
+#   --verbose  全出力表示 (xcodebuild 生ログ含む)
+#   (default)  ==> 進捗 + warnings/errors + BUILD 結果のみ
+#   --quiet    warnings/errors のみ (==> 進捗も非表示)
+#
+# 使い方: 他のフラグの前後どちらでも指定可
+#   ./gen_build_install.zsh --quiet -n 'iPhone 16'
+#   ./gen_build_install.zsh -n 'iPhone 16' --verbose
+# ------------------------------------------------------------------
+VERBOSITY="normal"
+_remaining_args=()
+for _a in "$@"; do
+  case "$_a" in
+    --verbose) VERBOSITY="verbose" ;;
+    --quiet)   VERBOSITY="quiet"   ;;
+    *)         _remaining_args+=("$_a") ;;
+  esac
+done
+if (( ${#_remaining_args[@]} )); then
+  set -- "${_remaining_args[@]}"
+else
+  set --
+fi
+
+# ------------------------------------------------------------------
+# Output helpers
+# ------------------------------------------------------------------
+log_info() {
+  [[ "$VERBOSITY" != "quiet" ]] && print -- "$*" || true
+}
+
+# Run xcodegen; in normal/quiet mode suppress informational output.
+# On failure, always show full output regardless of verbosity.
+run_xcode_gen() {
+  if [[ "$VERBOSITY" == "verbose" ]]; then
+    xcodegen generate
+    return
+  fi
+  local _log _rc=0
+  _log=$(mktemp)
+  xcodegen generate > "$_log" 2>&1 || _rc=$?
+  if [[ $_rc -ne 0 ]]; then
+    cat "$_log" >&2
+  fi
+  rm -f "$_log"
+  return $_rc
+}
+
+# Run xcodebuild with verbosity-filtered output.
+# Captures exit code correctly even with set -e.
+run_xcode_build() {
+  if [[ "$VERBOSITY" == "verbose" ]]; then
+    xcodebuild "$@"
+    return
+  fi
+  local _log _rc=0
+  _log=$(mktemp)
+  xcodebuild "$@" > "$_log" 2>&1 || _rc=$?
+  if [[ "$VERBOSITY" == "normal" ]]; then
+    grep -E '(: warning:|: error:|\*\* BUILD )' "$_log" || true
+  else  # quiet: warnings/errors to stderr
+    grep -E '(: warning:|: error:)' "$_log" >&2 || true
+    # Always show build failure in quiet mode
+    if [[ $_rc -ne 0 ]]; then
+      grep '\*\* BUILD FAILED \*\*' "$_log" >&2 || true
+    fi
+  fi
+  rm -f "$_log"
+  return $_rc
+}
+
+# ------------------------------------------------------------------
 # usage
 # ------------------------------------------------------------------
 usage() {
@@ -61,6 +133,10 @@ Usage:
   ./gen_build_install.zsh --build-check[=configs]
                                               Build-only check (no install/launch)
                                               configs: comma-separated Debug,Release (default: Release)
+
+Options:
+  --verbose   Show full xcodebuild output
+  --quiet     Show only warnings and errors
 EOF
   else
     cat <<EOF
@@ -69,6 +145,10 @@ Usage:
   ./gen_build_install.zsh --build-check[=configs]
                                               Build-only check (no install)
                                               configs: comma-separated Debug,Release (default: Release)
+
+Options:
+  --verbose   Show full xcodebuild output
+  --quiet     Show only warnings and errors
 EOF
     if [[ -n "$NOTARY_PROFILE" ]]; then
       cat <<EOF
@@ -121,8 +201,8 @@ archive_for_app_store() {
   local export_dir="build/export"
   local export_opts="build/ExportOptions.plist"
 
-  echo "==> xcodegen generate"
-  xcodegen generate
+  log_info "==> xcodegen generate"
+  run_xcode_gen
 
   rm -rf "$archive_path" "$export_dir"
   mkdir -p "build"
@@ -146,24 +226,24 @@ archive_for_app_store() {
 </plist>
 PLIST
 
-  echo "==> Archiving $SCHEME (Release) for iOS ..."
-  xcodebuild -project "$PROJECT" -scheme "$SCHEME" \
+  log_info "==> Archiving $SCHEME (Release) for iOS ..."
+  run_xcode_build -project "$PROJECT" -scheme "$SCHEME" \
     -configuration Release \
     -destination 'generic/platform=iOS' \
     -archivePath "$archive_path" \
     archive
 
-  echo "==> Exporting .ipa to $export_dir ..."
-  xcodebuild -exportArchive \
+  log_info "==> Exporting .ipa to $export_dir ..."
+  run_xcode_build -exportArchive \
     -archivePath "$archive_path" \
     -exportPath "$export_dir" \
     -exportOptionsPlist "$export_opts"
 
-  echo "==> Archive: $archive_path"
-  echo "==> IPA:     $export_dir/$SCHEME.ipa"
-  echo ""
-  echo "次のステップ: Transporter.app または"
-  echo "  xcrun altool --upload-app -f $export_dir/$SCHEME.ipa -t ios -u <Apple ID> -p <app-specific-password>"
+  log_info "==> Archive: $archive_path"
+  log_info "==> IPA:     $export_dir/$SCHEME.ipa"
+  log_info ""
+  log_info "次のステップ: Transporter.app または"
+  log_info "  xcrun altool --upload-app -f $export_dir/$SCHEME.ipa -t ios -u <Apple ID> -p <app-specific-password>"
 }
 
 # ------------------------------------------------------------------
@@ -172,7 +252,7 @@ PLIST
 release_macos() {
   local version="${1:-}"
 
-  echo "==> Verifying HEAD == origin/main ..."
+  log_info "==> Verifying HEAD == origin/main ..."
   git rev-parse --git-dir > /dev/null 2>&1 || { echo "Error: not a git repository" >&2; exit 1; }
   git fetch origin main --quiet || { echo "Error: failed to fetch origin/main" >&2; exit 1; }
 
@@ -190,20 +270,20 @@ release_macos() {
     git status --short >&2
     exit 1
   fi
-  echo "    HEAD: $local_head (matches origin/main, clean)"
+  log_info "    HEAD: $local_head (matches origin/main, clean)"
 
-  echo "==> xcodegen generate"
-  xcodegen generate
+  log_info "==> xcodegen generate"
+  run_xcode_gen
 
   if [[ -z "$version" ]]; then
     version="$(xcodebuild -project "$PROJECT" -scheme "$SCHEME" \
       -configuration "$CONFIG" -showBuildSettings 2>/dev/null \
       | grep -m1 ' MARKETING_VERSION' | awk '{print $3}')"
   fi
-  echo "==> Release version: $version"
+  log_info "==> Release version: $version"
 
-  echo "==> Building $SCHEME ($CONFIG) with Developer ID signing ..."
-  xcodebuild -project "$PROJECT" -scheme "$SCHEME" \
+  log_info "==> Building $SCHEME ($CONFIG) with Developer ID signing ..."
+  run_xcode_build -project "$PROJECT" -scheme "$SCHEME" \
     -configuration "$CONFIG" \
     CODE_SIGN_IDENTITY="Developer ID Application" \
     CODE_SIGN_STYLE=Manual \
@@ -213,7 +293,7 @@ release_macos() {
   local app_path
   app_path="$(resolve_app_path -project "$PROJECT" -scheme "$SCHEME" -configuration "$CONFIG")/$SCHEME.app"
 
-  echo "==> Verifying signature ..."
+  log_info "==> Verifying signature ..."
   codesign -dv --verbose=2 "$app_path" 2>&1 | grep -E '(Authority|TeamIdentifier|Identifier)' || true
   codesign --verify --strict --verbose=2 "$app_path"
 
@@ -221,11 +301,11 @@ release_macos() {
   local notarize_zip="$RELEASE_DIR/$SCHEME-notarize-tmp.zip"
   local final_zip="$RELEASE_DIR/$SCHEME-$version.zip"
 
-  echo "==> Zipping for notarization ..."
+  log_info "==> Zipping for notarization ..."
   rm -f "$notarize_zip"
   /usr/bin/ditto -c -k --keepParent "$app_path" "$notarize_zip"
 
-  echo "==> Submitting to Apple notary service (profile: $NOTARY_PROFILE) ..."
+  log_info "==> Submitting to Apple notary service (profile: $NOTARY_PROFILE) ..."
   local submit_log="$RELEASE_DIR/notarize-submit.log"
   set +e
   xcrun notarytool submit "$notarize_zip" \
@@ -244,17 +324,17 @@ release_macos() {
     exit 1
   fi
 
-  echo "==> Stapling notary ticket to .app ..."
+  log_info "==> Stapling notary ticket to .app ..."
   xcrun stapler staple "$app_path"
   xcrun stapler validate "$app_path"
 
-  echo "==> Creating final release zip ..."
+  log_info "==> Creating final release zip ..."
   rm -f "$final_zip" "$notarize_zip"
   /usr/bin/ditto -c -k --keepParent "$app_path" "$final_zip"
 
-  echo ""
-  echo "==> Release ready: $final_zip"
-  echo "    Upload: gh release create v$version $final_zip --title 'v$version' --notes '...'"
+  log_info ""
+  log_info "==> Release ready: $final_zip"
+  log_info "    Upload: gh release create v$version $final_zip --title 'v$version' --notes '...'"
 }
 
 # ------------------------------------------------------------------
@@ -277,8 +357,8 @@ case "$1" in
       BC_CONFIGS=("${(@s/,/)BC_ARG}")
     fi
 
-    echo "==> xcodegen generate"
-    xcodegen generate
+    log_info "==> xcodegen generate"
+    run_xcode_gen
 
     BC_FAILED=0
     for BC_CFG in "${BC_CONFIGS[@]}"; do
@@ -293,16 +373,16 @@ case "$1" in
         BC_DEST_ARGS=()
       fi
 
-      echo "==> Build check: $SCHEME ($BC_CFG) ..."
+      log_info "==> Build check: $SCHEME ($BC_CFG) ..."
       set +e
-      xcodebuild -project "$PROJECT" -scheme "$SCHEME" \
+      run_xcode_build -project "$PROJECT" -scheme "$SCHEME" \
         -configuration "$BC_CFG" \
         "${BC_DEST_ARGS[@]}" \
         build
       BC_RC=$?
       set -e
       if [[ $BC_RC -eq 0 ]]; then
-        echo "==> $BC_CFG: BUILD SUCCEEDED"
+        log_info "==> $BC_CFG: BUILD SUCCEEDED"
       else
         echo "==> $BC_CFG: BUILD FAILED" >&2
         BC_FAILED=1
@@ -313,7 +393,7 @@ case "$1" in
       echo "==> Build check FAILED" >&2
       exit 1
     fi
-    echo "==> All build checks passed!"
+    log_info "==> All build checks passed!"
     exit 0
     ;;
 
@@ -322,11 +402,11 @@ case "$1" in
     [[ "$PLATFORM" != "ios" ]] && { echo "Error: --sim is only for iOS apps (set BUNDLE_ID in .build_config)" >&2; exit 1; }
     SIM_NAME="${2:-iPhone 17 Pro}"
 
-    echo "==> xcodegen generate"
-    xcodegen generate
+    log_info "==> xcodegen generate"
+    run_xcode_gen
 
-    echo "==> Building $SCHEME (Debug) for Simulator '$SIM_NAME' ..."
-    xcodebuild -project "$PROJECT" -scheme "$SCHEME" \
+    log_info "==> Building $SCHEME (Debug) for Simulator '$SIM_NAME' ..."
+    run_xcode_build -project "$PROJECT" -scheme "$SCHEME" \
       -configuration Debug \
       -destination "platform=iOS Simulator,name=$SIM_NAME" \
       build
@@ -335,17 +415,17 @@ case "$1" in
       -project "$PROJECT" -scheme "$SCHEME" \
       -configuration Debug -destination "platform=iOS Simulator,name=$SIM_NAME")/$SCHEME.app"
 
-    echo "==> Booting Simulator '$SIM_NAME' ..."
+    log_info "==> Booting Simulator '$SIM_NAME' ..."
     xcrun simctl boot "$SIM_NAME" 2>/dev/null || true
     open -a Simulator
 
-    echo "==> Installing $APP_PATH"
+    log_info "==> Installing $APP_PATH"
     xcrun simctl install "$SIM_NAME" "$APP_PATH"
 
-    echo "==> Launching $SCHEME on Simulator ..."
+    log_info "==> Launching $SCHEME on Simulator ..."
     xcrun simctl launch "$SIM_NAME" "$BUNDLE_ID"
 
-    echo "==> Done!"
+    log_info "==> Done!"
     exit 0
     ;;
 
@@ -381,22 +461,22 @@ case "$1" in
   --mac|-m)
     [[ "$PLATFORM" != "macos" ]] && { echo "Error: --mac is only for macOS apps (leave BUNDLE_ID empty in .build_config)" >&2; exit 1; }
 
-    echo "==> xcodegen generate"
-    xcodegen generate
+    log_info "==> xcodegen generate"
+    run_xcode_gen
 
-    echo "==> Building $SCHEME ($CONFIG) ..."
-    xcodebuild -project "$PROJECT" -scheme "$SCHEME" \
+    log_info "==> Building $SCHEME ($CONFIG) ..."
+    run_xcode_build -project "$PROJECT" -scheme "$SCHEME" \
       -configuration "$CONFIG" \
       build
 
     APP_PATH="$(resolve_app_path \
       -project "$PROJECT" -scheme "$SCHEME" -configuration "$CONFIG")/$SCHEME.app"
 
-    echo "==> Installing $APP_PATH to /Applications ..."
+    log_info "==> Installing $APP_PATH to /Applications ..."
     rm -rf "/Applications/$SCHEME.app"
     /usr/bin/ditto "$APP_PATH" "/Applications/$SCHEME.app"
 
-    echo "==> Done!"
+    log_info "==> Done!"
     exit 0
     ;;
 
@@ -421,13 +501,13 @@ esac
 # ------------------------------------------------------------------
 # iOS: build & install to physical device (after -n / -i resolved)
 # ------------------------------------------------------------------
-echo "==> Target device: $DEVICE_ID"
+log_info "==> Target device: $DEVICE_ID"
 
-echo "==> xcodegen generate"
-xcodegen generate
+log_info "==> xcodegen generate"
+run_xcode_gen
 
-echo "==> Building $SCHEME ($CONFIG) ..."
-xcodebuild -project "$PROJECT" -scheme "$SCHEME" \
+log_info "==> Building $SCHEME ($CONFIG) ..."
+run_xcode_build -project "$PROJECT" -scheme "$SCHEME" \
   -configuration "$CONFIG" \
   -destination "id=$DEVICE_ID" \
   build
@@ -436,8 +516,8 @@ APP_PATH="$(resolve_app_path \
   -project "$PROJECT" -scheme "$SCHEME" \
   -configuration "$CONFIG" -destination "id=$DEVICE_ID")/$SCHEME.app"
 
-echo "==> Installing $APP_PATH"
+log_info "==> Installing $APP_PATH"
 xcrun devicectl device install app --device "$DEVICE_ID" "$APP_PATH" \
   2>&1 | grep -v "Failed to load provisioning"
 
-echo "==> Done!"
+log_info "==> Done!"
