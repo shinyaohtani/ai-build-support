@@ -1,0 +1,90 @@
+# iOS app project template for XcodeGen.
+# Copy this file to your project root as project.yml,
+# then replace all occurrences of MyApp with your app name.
+#
+# Quick checklist after copy:
+#   1. Replace MyApp → YourAppName (case-sensitive, 6 occurrences)
+#   2. Set PRODUCT_BUNDLE_IDENTIFIER
+#   3. Set INFOPLIST_KEY_CFBundleDisplayName
+#   4. Set deploymentTarget iOS version
+#   5. Set LSApplicationCategoryType
+#   6. Uncomment / add NSUsageDescription keys as needed
+#   7. Set TARGETED_DEVICE_FAMILY: "1" (iPhone) or "1,2" (+iPad)
+
+include:
+  - path: ai-build-support/xcodegen_base_ios.yml
+
+name: MyApp
+options:
+  deploymentTarget:
+    iOS: "26.0"
+
+targets:
+  MyApp:
+    type: application
+    platform: iOS
+    sources:
+      - MyApp
+    info:
+      path: MyApp/Info.plist
+      properties:
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          # - UIInterfaceOrientationLandscapeLeft
+          # - UIInterfaceOrientationLandscapeRight
+        UILaunchScreen: {}
+        # NSCameraUsageDescription: ""
+        # NSPhotoLibraryUsageDescription: ""
+        # NSPhotoLibraryAddUsageDescription: ""
+        # NSLocationWhenInUseUsageDescription: ""
+        CFBundleDevelopmentRegion: "ja"
+        CFBundleLocalizations:
+          - ja
+        LSApplicationCategoryType: "public.app-category.utilities"
+        ITSAppUsesNonExemptEncryption: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.aabce.myapp
+        INFOPLIST_KEY_CFBundleDisplayName: "MyApp"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        MARKETING_VERSION: "1.0.0"
+        CURRENT_PROJECT_VERSION: 1
+        TARGETED_DEVICE_FAMILY: "1"
+        SWIFT_VERSION: "6"
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: PNKEK75AK4
+
+  MyAppUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - MyAppUITests
+    dependencies:
+      - target: MyApp
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.aabce.myapp.uitests
+        SWIFT_VERSION: "6"
+        GENERATE_INFOPLIST_FILE: true
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: PNKEK75AK4
+
+schemes:
+  MyApp:
+    build:
+      targets:
+        MyApp: all
+        MyAppUITests: [test]
+    run:
+      config: Release
+      debugEnabled: false
+    test:
+      config: Debug
+      targets:
+        - MyAppUITests
+    profile:
+      config: Release
+    archive:
+      config: Release

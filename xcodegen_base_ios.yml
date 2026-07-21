@@ -1,0 +1,26 @@
+# XcodeGen base settings for iOS apps.
+# Include this from each project's project.yml:
+#
+#   include:
+#     - path: ai-build-support/xcodegen_base_ios.yml
+#
+# Override any value in the including file — dictionaries deep-merge
+# (project file wins), arrays replace entirely.
+
+options:
+  bundleIdPrefix: com.aabce
+  xcodeVersion: "2630"
+
+settings:
+  base:
+    DEAD_CODE_STRIPPING: YES
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS: YES
+    ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOL_FRAMEWORKS: YES
+    ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS: YES
+    SWIFT_EMIT_LOC_STRINGS: YES
+    GENERATE_LOCALIZED_STRINGS_SWIFT_FILE: YES
+    LOCALIZATION_PREFERS_STRING_CATALOGS: YES
+    STRING_CATALOG_GENERATE_SYMBOLS: YES
+    DEVELOPMENT_TEAM: PNKEK75AK4
+    CODE_SIGN_STYLE: Automatic

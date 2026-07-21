@@ -1,0 +1,62 @@
+# macOS app project template for XcodeGen.
+# Copy this file to your project root as project.yml,
+# then replace all occurrences of MyApp with your app name.
+#
+# Quick checklist after copy:
+#   1. Replace MyApp → YourAppName (case-sensitive, ~5 occurrences)
+#   2. Set PRODUCT_BUNDLE_IDENTIFIER
+#   3. Set INFOPLIST_KEY_CFBundleDisplayName
+#   4. Set INFOPLIST_KEY_LSApplicationCategoryType
+#   5. Set deploymentTarget macOS version
+#   6. Uncomment entitlements block if sandbox / file access is needed
+
+include:
+  - path: ai-build-support/xcodegen_base_macos.yml
+
+name: MyApp
+options:
+  deploymentTarget:
+    macOS: "14.0"
+
+targets:
+  MyApp:
+    type: application
+    platform: macOS
+    sources:
+      - MyApp
+    info:
+      path: MyApp/Info.plist
+      properties:
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+    # entitlements:
+    #   path: MyApp/MyApp.entitlements
+    #   properties:
+    #     com.apple.security.app-sandbox: true
+    #     com.apple.security.files.user-selected.read-write: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.aabce.MyApp
+        INFOPLIST_KEY_CFBundleDisplayName: MyApp
+        INFOPLIST_KEY_LSApplicationCategoryType: "public.app-category.utilities"
+        INFOPLIST_KEY_NSHumanReadableCopyright: "(C) Shinya Ohtani"
+        MARKETING_VERSION: "1.0.0"
+        CURRENT_PROJECT_VERSION: 1
+        SWIFT_VERSION: "6"
+        COMBINE_HIDPI_IMAGES: YES
+        ENABLE_PREVIEWS: YES
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+
+schemes:
+  MyApp:
+    build:
+      targets:
+        MyApp: all
+    run:
+      config: Release
+      debugEnabled: false
+    profile:
+      config: Release
+    archive:
+      config: Release
