@@ -12,3 +12,13 @@ BUNDLE_ID="com.aabce.myapp"
 # NOTARY_PROFILE="my-app-notary"
 # Setup: xcrun notarytool store-credentials "my-app-notary" \
 #          --apple-id <email> --team-id PNKEK75AK4 --password <app-pw>
+#
+# --- fetch_log.sh 用設定 ---
+# デバイス上でのデバッグログファイル名 (Documents/ 以下)
+LOG_NAME="myapp_debug.log"
+#
+# 実機デバイス名 (省略時: "iPhone 16 2024")
+# DEVICE_NAME="iPhone 16 2024"
+#
+# バックアップ先ルートディレクトリ (省略時: "backups")
+# BACKUP_ROOT="backups"
