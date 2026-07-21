@@ -436,6 +436,7 @@ case "$1" in
   # ---- iOS: list devices -------------------------------------------
   --list|-l)
     [[ "$PLATFORM" != "ios" ]] && { echo "Error: --list is only for iOS apps" >&2; exit 1; }
+    run_xcode_gen
     list_devices
     exit 0
     ;;
@@ -444,6 +445,7 @@ case "$1" in
   -n)
     [[ "$PLATFORM" != "ios" ]] && { echo "Error: -n is only for iOS apps" >&2; exit 1; }
     [[ $# -lt 2 ]] && { echo "Error: -n requires a device name." >&2; exit 1; }
+    run_xcode_gen
     DEVICE_ID=$(resolve_device_id "$2")
     ;;
 
@@ -451,6 +453,7 @@ case "$1" in
   -i)
     [[ "$PLATFORM" != "ios" ]] && { echo "Error: -i is only for iOS apps" >&2; exit 1; }
     [[ $# -lt 2 ]] && { echo "Error: -i requires a device ID." >&2; exit 1; }
+    run_xcode_gen
     DEVICE_ID="$2"
     ;;
 
@@ -506,9 +509,6 @@ esac
 # iOS: build & install to physical device (after -n / -i resolved)
 # ------------------------------------------------------------------
 log_info "==> Target device: $DEVICE_ID"
-
-log_info "==> xcodegen generate"
-run_xcode_gen
 
 log_info "==> Building $SCHEME ($CONFIG) ..."
 run_xcode_build -project "$PROJECT" -scheme "$SCHEME" \
