@@ -1,0 +1,14 @@
+# .build_config — プロジェクトルートに置く設定ファイル
+#
+# SCHEME は *.xcodeproj から自動検出するので通常は不要。
+# 複数の xcodeproj がある場合だけ明示する。
+# SCHEME="MyApp"
+#
+# iOS アプリ: BUNDLE_ID を設定する (--sim / --list / -n / -i / --archive が有効になる)
+BUNDLE_ID="com.aabce.myapp"
+#
+# macOS アプリ: BUNDLE_ID を空にして NOTARY_PROFILE を設定する (--mac / --release が有効になる)
+# BUNDLE_ID=""
+# NOTARY_PROFILE="my-app-notary"
+# Setup: xcrun notarytool store-credentials "my-app-notary" \
+#          --apple-id <email> --team-id PNKEK75AK4 --password <app-pw>
