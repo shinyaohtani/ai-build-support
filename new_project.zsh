@@ -20,12 +20,43 @@ set -euo pipefail
 SCRIPT_DIR="${0:A:h}"   # absolute path of ai-build-support/
 
 # ── arguments ────────────────────────────────────────────────────────────────
-if [[ $# -lt 1 ]]; then
-  print -u2 "Usage: $(basename $0) <AppName> [ios|macos] [bundle-suffix]"
-  print -u2 "  AppName:       PascalCase  (e.g. GardenLog)"
-  print -u2 "  ios|macos:     platform    (default: ios)"
-  print -u2 "  bundle-suffix: lowercase   (default: lowercase of AppName)"
-  exit 1
+usage() {
+  cat <<'EOF'
+Usage:
+  /path/to/ai-build-support/new_project.zsh <AppName> [ios|macos] [bundle-suffix]
+
+Arguments:
+  AppName        PascalCase app name (e.g. GardenLog)          [required]
+  ios|macos      target platform                                 [default: ios]
+  bundle-suffix  lowercase Bundle ID suffix (e.g. gardenlog)    [default: lowercase of AppName]
+
+Examples:
+  git init garden-log && cd garden-log
+  ~/unix/cloned/ai-build-support/new_project.zsh GardenLog
+  ~/unix/cloned/ai-build-support/new_project.zsh GardenLog ios gardenlog
+
+  git init link-helper && cd link-helper
+  ~/unix/cloned/ai-build-support/new_project.zsh LinkHelper macos linkhelper
+
+What this script does:
+  1. Add ai-build-support as a git submodule
+  2. Create .build_config  (BUNDLE_ID, LOG_NAME)
+  3. Generate project.yml  from ai-build-support/project_template_{ios,macos}.yml
+  4. Scaffold minimal SwiftUI source (App, ContentView, Assets, PrivacyInfo, UITests)
+  5. Create .gitignore
+  6. Run xcodegen generate
+  7. Make the initial commit
+
+After the script finishes:
+  gh repo create shinyaohtani/<AppName> --private --source=. --remote=origin
+  git push -u origin main
+  ./ai-build-support/gen_build_install.zsh --build-check
+EOF
+}
+
+if [[ $# -lt 1 || "$1" == "--help" || "$1" == "-h" ]]; then
+  usage
+  [[ $# -lt 1 ]] && exit 1 || exit 0
 fi
 
 APP_NAME="$1"
