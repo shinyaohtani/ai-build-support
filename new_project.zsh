@@ -48,7 +48,7 @@ What this script does:
   7. Make the initial commit
 
 After the script finishes:
-  gh repo create shinyaohtani/<AppName> --private --source=. --remote=origin
+  gh repo create shinyaohtani/<repo-dir-name> --private --source=. --remote=origin
   git push -u origin main
   ./ai-build-support/gen_build_install.zsh --build-check
 EOF
@@ -253,7 +253,8 @@ MSG
 echo ""
 echo "==> Done!"
 echo ""
+REPO_NAME="$(basename $PWD)"
 echo "Next steps:"
-echo "  gh repo create shinyaohtani/${APP_NAME} --private --source=. --remote=origin"
+echo "  gh repo create shinyaohtani/${REPO_NAME} --private --source=. --remote=origin"
 echo "  git push -u origin main"
 echo "  ./ai-build-support/gen_build_install.zsh --build-check"
