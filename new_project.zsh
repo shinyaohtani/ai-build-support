@@ -1,16 +1,16 @@
 #!/bin/zsh
 # new_project.zsh — Bootstrap a new XcodeGen iOS/macOS project
 #
-# Usage (from the directory where you keep your projects):
-#   /path/to/ai-build-support/new_project.zsh <AppName> [ios|macos] [bundle-suffix]
+# Run from inside the already-initialized git repo:
+#   git init garden-log && cd garden-log
+#   /path/to/ai-build-support/new_project.zsh GardenLog ios gardenlog
 #
-# Example:
-#   cd ~/unix/cloned
-#   ./ai-build-support/new_project.zsh GardenLog ios gardenlog
-#   ./ai-build-support/new_project.zsh LinkHelper macos linkhelper
+# Arguments:
+#   AppName       PascalCase app name  (e.g. GardenLog)      [required]
+#   ios|macos     platform             (default: ios)
+#   bundle-suffix lowercase suffix     (default: lowercase of AppName)
 #
 # After the script finishes:
-#   cd <AppName>
 #   gh repo create shinyaohtani/<AppName> --private --source=. --remote=origin
 #   git push -u origin main
 #   ./ai-build-support/gen_build_install.zsh --build-check
@@ -38,25 +38,19 @@ if [[ "$PLATFORM" != "ios" && "$PLATFORM" != "macos" ]]; then
   print -u2 "Error: platform must be 'ios' or 'macos'"; exit 1
 fi
 
-PROJECT_DIR="${PWD}/${APP_NAME}"
-if [[ -e "$PROJECT_DIR" ]]; then
-  print -u2 "Error: ${PROJECT_DIR} already exists"; exit 1
+# ── must be run inside a git repo ─────────────────────────────────────────────
+if ! git rev-parse --git-dir &>/dev/null; then
+  print -u2 "Error: not a git repository. Run 'git init' first."; exit 1
 fi
 
 # ── confirm ───────────────────────────────────────────────────────────────────
-echo "==> New ${PLATFORM} project"
+echo "==> New ${PLATFORM} project in $(pwd)"
 echo "    Name:      ${APP_NAME}"
 echo "    Bundle ID: ${BUNDLE_ID}"
 echo "    Log name:  ${LOG_NAME}"
-echo "    Directory: ${PROJECT_DIR}"
 echo -n "    Continue? [Y/n]: "
 read -r ANSWER
 [[ "${ANSWER}" == "n" || "${ANSWER}" == "N" ]] && { echo "Aborted."; exit 1; }
-
-# ── git init ─────────────────────────────────────────────────────────────────
-mkdir -p "${PROJECT_DIR}"
-cd "${PROJECT_DIR}"
-git init
 
 # ── submodule ─────────────────────────────────────────────────────────────────
 echo "==> Adding ai-build-support submodule..."
@@ -89,7 +83,6 @@ sed \
 echo "==> Creating source structure..."
 mkdir -p "${APP_NAME}"
 
-# App entry point
 cat > "${APP_NAME}/${APP_NAME}App.swift" <<EOF
 import SwiftUI
 
@@ -103,7 +96,6 @@ struct ${APP_NAME}App: App {
 }
 EOF
 
-# ContentView
 cat > "${APP_NAME}/ContentView.swift" <<EOF
 import SwiftUI
 
@@ -114,7 +106,6 @@ struct ContentView: View {
 }
 EOF
 
-# Assets.xcassets (minimal — add icons later)
 mkdir -p "${APP_NAME}/Assets.xcassets/AppIcon.appiconset"
 cat > "${APP_NAME}/Assets.xcassets/Contents.json" <<'JSON'
 {
@@ -129,7 +120,6 @@ cat > "${APP_NAME}/Assets.xcassets/AppIcon.appiconset/Contents.json" <<'JSON'
 }
 JSON
 
-# PrivacyInfo.xcprivacy (iOS 17+ App Store requirement)
 if [[ "$PLATFORM" == "ios" ]]; then
   cat > "${APP_NAME}/PrivacyInfo.xcprivacy" <<'XML'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -156,10 +146,7 @@ if [[ "$PLATFORM" == "ios" ]]; then
 </dict>
 </plist>
 XML
-fi
 
-# UITest target (iOS only; macOS template has no test target)
-if [[ "$PLATFORM" == "ios" ]]; then
   mkdir -p "${APP_NAME}UITests"
   cat > "${APP_NAME}UITests/${APP_NAME}UITests.swift" <<EOF
 import XCTest
@@ -233,10 +220,9 @@ MSG
 
 # ── done ──────────────────────────────────────────────────────────────────────
 echo ""
-echo "==> Done!  ${PROJECT_DIR}"
+echo "==> Done!"
 echo ""
 echo "Next steps:"
-echo "  cd ${APP_NAME}"
 echo "  gh repo create shinyaohtani/${APP_NAME} --private --source=. --remote=origin"
 echo "  git push -u origin main"
 echo "  ./ai-build-support/gen_build_install.zsh --build-check"
