@@ -74,6 +74,13 @@ if ! git rev-parse --git-dir &>/dev/null; then
   print -u2 "Error: not a git repository. Run 'git init' first."; exit 1
 fi
 
+# ── abort if already initialized ──────────────────────────────────────────────
+if [[ -f .gitmodules ]] || [[ -d ai-build-support ]]; then
+  print -u2 "Error: this repository is already initialized (ai-build-support exists)."
+  print -u2 "       new_project.zsh is for fresh repositories only."
+  exit 1
+fi
+
 # ── confirm ───────────────────────────────────────────────────────────────────
 echo "==> New ${PLATFORM} project in $(pwd)"
 echo "    Name:      ${APP_NAME}"
