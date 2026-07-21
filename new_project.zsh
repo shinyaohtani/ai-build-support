@@ -80,9 +80,9 @@ fi
 # ── project.yml ───────────────────────────────────────────────────────────────
 echo "==> Creating project.yml from template..."
 sed \
-  -e "s/MyApp/${APP_NAME}/g" \
   -e "s/com\.aabce\.MyApp/com.aabce.${BUNDLE_SUFFIX}/g" \
   -e "s/com\.aabce\.myapp/com.aabce.${BUNDLE_SUFFIX}/g" \
+  -e "s/MyApp/${APP_NAME}/g" \
   "${SCRIPT_DIR}/project_template_${PLATFORM}.yml" > project.yml
 
 # ── source structure ──────────────────────────────────────────────────────────
