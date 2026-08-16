@@ -4,6 +4,10 @@
 #   ./fetch_log.sh --sim                 起動中シミュレータ (booted) からデバッグログ取得
 #   ./fetch_log.sh --backup-docs         実機の Documents をバックアップ
 #   ./fetch_log.sh --restore-docs [PATH] バックアップから復元 (PATH省略時は最新)
+#   ./fetch_log.sh --backup-appdata      実機のアプリデータ一式をバックアップ
+#                                        (Documents + Library/Application Support)
+#   ./fetch_log.sh --restore-appdata [PATH]
+#                                        アプリデータ一式を復元 (PATH省略時は最新)
 
 set -e
 
@@ -32,7 +36,8 @@ case "$1" in
   --backup-docs)
     TS=$(date +%Y%m%d-%H%M%S)
     BACKUP_DIR="${BACKUP_ROOT}/${TS}"
-    mkdir -p "$BACKUP_DIR"
+    # devicectl は --destination のディレクトリを自分では作らない。先に用意する。
+    mkdir -p "$BACKUP_DIR/Documents"
 
     echo "==> Backing up Documents/ from device..."
     xcrun devicectl device copy from \
@@ -45,6 +50,79 @@ case "$1" in
     DOC_COUNT=$(find "$BACKUP_DIR/Documents" -type f 2>/dev/null | wc -l | tr -d ' ')
     echo "==> Backup complete: $BACKUP_DIR"
     echo "  Documents: $DOC_COUNT files"
+    if [ "$DOC_COUNT" -eq 0 ]; then
+      echo "  Note: Documents is empty. SwiftData/CoreData apps keep their store in"
+      echo "        Library/Application Support. Use --backup-appdata instead."
+    fi
+    exit 0
+    ;;
+
+  --backup-appdata)
+    # SwiftData / CoreData のストアは Library/Application Support にある。
+    # Documents しか見ない --backup-docs では取りこぼすため、アプリデータ一式を取る。
+    TS=$(date +%Y%m%d-%H%M%S)
+    BACKUP_DIR="${BACKUP_ROOT}/${TS}"
+    mkdir -p "$BACKUP_DIR/Documents" "$BACKUP_DIR/Application Support"
+
+    echo "==> Backing up app data from device..."
+    for SUBDIR in "Documents" "Library/Application Support"; do
+      DEST="$BACKUP_DIR/$(basename "$SUBDIR")"
+      # 空のディレクトリや未作成のディレクトリで全体を止めない。
+      xcrun devicectl device copy from \
+        --device "$DEVICE_NAME" \
+        --domain-type appDataContainer \
+        --domain-identifier "$BUNDLE_ID" \
+        --source "$SUBDIR" \
+        --destination "$DEST" || echo "  (skipped: $SUBDIR)"
+    done
+
+    FILE_COUNT=$(find "$BACKUP_DIR" -type f 2>/dev/null | wc -l | tr -d ' ')
+    echo "==> Backup complete: $BACKUP_DIR"
+    echo "  Files: $FILE_COUNT"
+    exit 0
+    ;;
+
+  --restore-appdata)
+    if [ -n "$2" ]; then
+      BACKUP_DIR="$2"
+    else
+      BACKUP_DIR=$(find "$BACKUP_ROOT" -maxdepth 1 -type d -name '20??????-??????' 2>/dev/null | sort | tail -1)
+    fi
+
+    if [ -z "$BACKUP_DIR" ] || [ ! -d "$BACKUP_DIR" ]; then
+      echo "No backup found. Run './fetch_log.sh --backup-appdata' first."
+      exit 1
+    fi
+
+    echo "==> Restoring app data from: $BACKUP_DIR"
+    echo "    Make sure the app is NOT running on the device (force quit first)."
+    printf "    Continue? [y/N]: "
+    read -r ANSWER
+    if [ "$ANSWER" != "y" ] && [ "$ANSWER" != "Y" ]; then
+      echo "Aborted."
+      exit 1
+    fi
+
+    if [ -d "$BACKUP_DIR/Documents" ]; then
+      xcrun devicectl device copy to \
+        --device "$DEVICE_NAME" \
+        --domain-type appDataContainer \
+        --domain-identifier "$BUNDLE_ID" \
+        --source "$BACKUP_DIR/Documents" \
+        --destination Documents
+    fi
+
+    if [ -d "$BACKUP_DIR/Application Support" ]; then
+      xcrun devicectl device copy to \
+        --device "$DEVICE_NAME" \
+        --domain-type appDataContainer \
+        --domain-identifier "$BUNDLE_ID" \
+        --source "$BACKUP_DIR/Application Support" \
+        --destination "Library/Application Support"
+    fi
+
+    echo "==> Restore complete."
+    echo "    Launch the app on the device to verify."
     exit 0
     ;;
 
@@ -117,7 +195,7 @@ case "$1" in
 
   *)
     echo "Unknown option: $1"
-    sed -n '2,6p' "$0"
+    sed -n '2,11p' "$0"
     exit 1
     ;;
 esac

@@ -193,6 +193,13 @@ macOS アプリのインストール:
 | `--sim` | 起動中シミュレータ（booted）から同上 |
 | `--backup-docs` | 実機の `Documents/` フォルダ全体を `backups/<timestamp>/` にバックアップ |
 | `--restore-docs [PATH]` | バックアップから実機に `Documents/` を復元（省略時は最新のバックアップ） |
+| `--backup-appdata` | 実機のアプリデータ一式（`Documents/` + `Library/Application Support/`）をバックアップ |
+| `--restore-appdata [PATH]` | バックアップからアプリデータ一式を復元（省略時は最新のバックアップ） |
+
+> **SwiftData / CoreData を使うアプリは `--backup-appdata` を使うこと。**
+> ストア（`default.store`, `-shm`, `-wal`）は `Documents/` ではなく
+> `Library/Application Support/` に置かれるため、`--backup-docs` では
+> 空のフォルダしか取れない。
 
 ログ取得例:
 ```zsh
